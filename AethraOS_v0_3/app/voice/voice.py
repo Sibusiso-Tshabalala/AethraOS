@@ -401,19 +401,11 @@ class VoiceEngine:
                     pass
 
     def _speak_pyttsx3(self, text: str):
-        """Sentence-by-sentence SAPI speech with natural pauses."""
-        sentences = self._split_sentences(text)
-        if not sentences:
-            sentences = [text]
-
-        for sentence in sentences:
-            if self._stop_requested.is_set():
-                break
-            self.tts_engine.say(sentence)
-            self.tts_engine.runAndWait()
-            # Brief pause between sentences
-            if not self._stop_requested.is_set():
-                time.sleep(0.18)
+        """Speak the full reply in one pass so it is not cut after the first line."""
+        if self._stop_requested.is_set():
+            return
+        self.tts_engine.say(text[:1200])
+        self.tts_engine.runAndWait()
 
     def _speak_edge(self, text: str):
         """

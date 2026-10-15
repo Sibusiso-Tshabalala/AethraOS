@@ -1233,6 +1233,29 @@ class AethraBrain:
         }
         return tool_name not in safe_tools
 
+    def _tools_for(self, user_message: str):
+        """Send only the tools this request needs so a small model can still call them."""
+        text = (user_message or "").lower()
+        core = {
+            "open_application", "focus_application", "get_active_window",
+            "type_text", "press_key", "hotkey", "take_screenshot",
+            "get_screen_summary", "see_screen", "get_system_info",
+            "get_system_health", "list_workflows", "run_workflow",
+            "search_web", "news_brief", "morning_brief", "poll_inbox",
+        }
+        if any(word in text for word in ("project", "vscode", "vs code", "python", "code")):
+            core.update({"create_project", "run_project", "open_in_vscode", "read_user_file", "read_project_file"})
+        if any(word in text for word in ("mail", "email", "gmail", "outlook", "inbox")):
+            core.update({"read_outlook_inbox", "read_gmail_inbox", "create_gmail_draft", "list_gmail_drafts"})
+        if any(word in text for word in ("remind", "alarm", "calendar", "schedule")):
+            core.update({"create_reminder", "create_alarm", "list_reminders", "get_agenda", "add_calendar_event"})
+        if any(word in text for word in ("file", "inspect", "bug", "source")):
+            core.update({"inventory_project", "read_project_file", "propose_patch", "repair_history"})
+        if not any(word in text for word in ("project", "mail", "email", "remind", "file", "inspect")):
+            core.update({"create_project", "open_in_vscode", "create_reminder", "read_outlook_inbox"})
+        selected = [tool for tool in self.tools if tool.get("name") in core]
+        return selected or self.tools[:12]
+
     def _risk_level(self, tool_name: str) -> str:
         high = {"send_gmail_draft", "open_executable", "reply_in_outlook_thread", "restore_backup"}
         medium = {"create_project", "run_project", "create_text_file", "queue_side_task", "watch_folder"}
@@ -2219,7 +2242,7 @@ You are an assistant operating a real computer.
                     response = self.client.responses.create(
                         model=self.model,
                         input=conversation,
-                        tools=self.tools,
+                        tools=self._tools_for(user_message),
                     )
                 except Exception as exc:
                     if "context size" in str(exc).lower() or "8192" in str(exc):
@@ -2227,7 +2250,7 @@ You are an assistant operating a real computer.
                         response = self.client.responses.create(
                             model=self.model,
                             input=short,
-                            tools=self.tools,
+                            tools=self._tools_for(user_message),
                         )
                     else:
                         raise
